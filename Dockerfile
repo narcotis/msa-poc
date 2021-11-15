@@ -1,7 +1,5 @@
-FROM python:3.7
+FROM fastapi:python3.9-slim
 
-RUN pip install django
+RUN pip install nats-py
 
-WORKDIR /web
-
-CMD python manage.py runserver
+WORKDIR /app

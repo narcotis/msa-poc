@@ -1,12 +1,14 @@
 version: "3"
 services:
   web:
-    image: django:tmp
+    image: fastapi:python3.9-slim
     ports:
       - "8000:8000"
     volumes:
-      - ./web:/web
-    command: python manage.py runserver 0:8000
+      - ./app:/app
+    environment:
+      - MODULE_NAME=api.main
+      - PORT=8000
   krakend:
     image: devopsfaith/krakend:1.4.1
     ports:
