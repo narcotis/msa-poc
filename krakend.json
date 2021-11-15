@@ -1,0 +1,98 @@
+{
+  "version": 2,
+  "name": "First API Gateway",
+  "port": 8080,
+  "cache_ttl": "3600s",
+  "timeout": "10s",
+  "extra_config": {
+    "github_com/devopsfaith/krakend-cors": {
+      "allow_origins": [ "https://login.algorithmlabs.io", "http://localhost:8000" ],
+      "allow_methods": [ "GET", "HEAD", "POST", "PUT", "PATCH", "DELETE" ],
+      "expose_headers": [ "*" ],
+      "allow_headers": [ "*" ],
+      "max_age": "12h",
+      "allow_credentials": true,
+      "debug": false
+    }
+  },
+  "extra_config": {
+    "github_com/devopsfaith/krakend-gologging": {
+      "level":  "DEBUG",
+      "prefix": "[KRAKEND]",
+      "syslog": false,
+      "stdout": true
+    }
+  },
+  "endpoints": [
+    {
+      "endpoint": "/",
+      "method": "GET",
+      "backend": [
+        {
+          "host": [
+            "http://localhost:8080"
+          ],
+          "url_pattern": "/__health"
+        }
+      ]
+    },
+    {
+      "endpoint": "/debug",
+      "method": "OPTIONS",
+      "output_encoding": "no-op",
+      "querystring_params": ["*"],
+      "headers_to_pass": ["*"],
+      "backend": [
+        {
+          "encoding": "no-op",
+          "url_pattern": "/debug/get",
+          "method": "OPTIONS",
+          "host": [
+            "http://web:8000"
+          ]
+        }
+      ]
+    },
+    {
+      "endpoint": "/debug",
+      "method": "GET",
+      "output_encoding": "no-op",
+      "querystring_params": ["*"],
+      "headers_to_pass": ["*"],
+      "extra_config": {
+        "github.com/devopsfaith/krakend-jose/validator": {
+          "alg": "RS256",
+          "jwk-url": "https://sso-dev.algorithmlabs.io/auth/realms/AlgorithmLABS/protocol/openid-connect/certs",
+          "cache": true,
+          "issuer": "https://sso-dev.algorithmlabs.io/auth/realms/AlgorithmLABS",
+          "disable_jwk_security": true
+        }
+      },
+      "backend": [
+        {
+          "encoding": "no-op",
+          "url_pattern": "/debug/get",
+          "method": "GET",
+          "host": [
+            "http://web:8000"
+          ]
+        }
+      ]
+    },
+    {
+      "endpoint": "/debug",
+      "method": "POST",
+      "querystring_params": ["*"],
+      "headers_to_pass": ["*"],
+      "backend": [
+        {
+          "url_pattern": "/debug/post",
+          "method": "POST",
+          "host": [
+            "http://web:8000"
+          ]
+        }
+      ]
+    }
+  ]
+}

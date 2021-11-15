@@ -1,0 +1,26 @@
+version: "3"
+services:
+  web:
+    image: django:tmp
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./web:/web
+    command: python manage.py runserver 0:8000
+  krakend:
+    image: devopsfaith/krakend:1.4.1
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./krakend.json:/etc/krakend/krakend.json
+  nats:
+    image: nats:latest
+    command: -js
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+      - "6222:6222"
+  nats-box:
+    image: natsio/nats-box:latest
+    stdin_open: true
+    tty: true
