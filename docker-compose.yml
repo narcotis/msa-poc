@@ -1,7 +1,7 @@
 version: "3"
 services:
   web:
-    image: fastapi:python3.9-slim
+    image: fastapi:nats
     ports:
       - "8000:8000"
     volumes:

@@ -38,23 +38,6 @@
     },
     {
       "endpoint": "/debug",
-      "method": "OPTIONS",
-      "output_encoding": "no-op",
-      "querystring_params": ["*"],
-      "headers_to_pass": ["*"],
-      "backend": [
-        {
-          "encoding": "no-op",
-          "url_pattern": "/debug/get",
-          "method": "OPTIONS",
-          "host": [
-            "http://web:8000"
-          ]
-        }
-      ]
-    },
-    {
-      "endpoint": "/debug",
       "method": "GET",
       "output_encoding": "no-op",
       "querystring_params": ["*"],
@@ -74,8 +57,14 @@
           "url_pattern": "/debug/get",
           "method": "GET",
           "host": [
-            "http://web:8000"
-          ]
+            "nats://nats:4222"
+          ],
+          "disable_host_sanitize": true,
+          "extra_config": {
+            "github.com/devopsfaith/krakend-pubsub/subscriber": {
+              "subscription_url": "api"
+            }
+          }
         }
       ]
     },
@@ -89,8 +78,14 @@
           "url_pattern": "/debug/post",
           "method": "POST",
           "host": [
-            "http://web:8000"
-          ]
+            "nats://nats:4222"
+          ],
+          "disable_host_sanitize": true,
+          "extra_config": {
+            "github.com/devopsfaith/krakend-pubsub/publisher": {
+              "topic_url": "api"
+            }
+          }
         }
       ]
     }
