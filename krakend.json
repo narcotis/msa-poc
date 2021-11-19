@@ -54,10 +54,8 @@
       "backend": [
         {
           "encoding": "no-op",
-          "url_pattern": "/debug/get",
-          "method": "GET",
           "host": [
-            "nats://nats:4222"
+            "nats://"
           ],
           "disable_host_sanitize": true,
           "extra_config": {
@@ -75,10 +73,8 @@
       "headers_to_pass": ["*"],
       "backend": [
         {
-          "url_pattern": "/debug/post",
-          "method": "POST",
           "host": [
-            "nats://nats:4222"
+            "nats://"
           ],
           "disable_host_sanitize": true,
           "extra_config": {

@@ -1,6 +1,6 @@
 version: "3"
 services:
-  web:
+  web1:
     image: fastapi:nats
     ports:
       - "8000:8000"
@@ -9,12 +9,33 @@ services:
     environment:
       - MODULE_NAME=api.main
       - PORT=8000
+    depends_on:
+      - krakend
+      - nats
+  worker2:
+    image: fastapi:
+  web2:
+    image: fastapi:nats
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./web:/app
+    environment:
+      - MODULE_NAME=api.main
+      - PORT=8001
+    depends_on:
+      - krakend
+      - nats
   krakend:
     image: devopsfaith/krakend:1.4.1
     ports:
       - "8080:8080"
     volumes:
       - ./krakend.json:/etc/krakend/krakend.json
+    environment:
+      - NATS_SERVER_URL=nats:4222
+    depends_on:
+      - nats
   nats:
     image: nats:latest
     command: -js
