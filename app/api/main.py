@@ -54,6 +54,7 @@ async def get():
         msgs.append(ms.data)
     return msgs
 
+
 @app.post("/post")
 async def post(tmp: dict):
     global nc
@@ -62,3 +63,4 @@ async def post(tmp: dict):
     ack = await js.publish(subject= "api.data", payload=data.encode(), stream="msa-test")
     acks.append(ack)
     return acks
+
