@@ -13,6 +13,13 @@ app = FastAPI()
 nc = NATS()
 js = nc.jetstream()
 
+if not nc.is_connected:
+    await nc.connect('nats://nats:4222')
+    await js.add_stream(name="msa-test", subjects=["api.>"])
+
+psub = await js.pull_subscribe("api.data", "psub")
+
+
 acks = []
 msgs = []
 
@@ -23,36 +30,23 @@ async def nats_connect():
         await nc.connect('nats://nats:4222')
     print("web2 connected!")
     await js.add_stream(name="msa-test", subjects=["api.>"])
-    #await js.account_info()
-    #psub = await js.pull_subscribe("api", "psub")
+
 
 @app.on_event("shutdown")
 async def nats_close():
-    global nc, js
+    global nc
     await nc.close()
 
-async def get_nats() -> NATS:
-    global nc
-    if not nc.is_connected:
-        await nc.connect('nats://nats:4222')
-    return nc
-
-@app.get("/")
-async def root():
-    if not nc.is_connected:
-        await nc.connect('nats://nats:4222')
-        print("web2 connected!")
-    return "web2 connected!"
 
 @app.get("/get")
 async def get():
-    global js
-    psub = await js.pull_subscribe("api.data", "psub")
+    global js, psub
     msg = await psub.fetch()
     #msgs.append(msg.data)
     for ms in msg:
         msgs.append(ms.data)
     return msgs
+
 
 @app.post("/post")
 async def post(tmp: dict):
