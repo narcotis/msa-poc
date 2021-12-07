@@ -39,11 +39,16 @@ class User(Base):
     # projects = relationship("Membership", back_populates='users')
     projects = relationship("Project", secondary=membership, back_populates='users')
 
+
 class ProjectType(Base):
     __tablename__ = "project_types"
     project_type_id = Column(Integer, primary_key=True, index=True)
     category = Column(Enum("HR", "Univ"))  # HR / Univ (Scope)
     project_type_name = Column(String)   # 상품 이름 (퇴사예측)
+    best_model_criteria = Column(String)  # auc, f1-score ......and so on
+    coverage = Column(Enum("Full", "Half", "Demo"), default="Full")
+    category = Column(Enum("classification", "regression"))
+    feature = Column(Integer, ForeignKey("features.feature_id"))
 
 
 class Project(Base):
@@ -84,32 +89,85 @@ class Organization(Base):
     admin_user = Column(Integer, ForeignKey("users.user_id"), nullable=True)
 
 
-class Step(Base):
+class Form(Base):
+    __tablename__ = "forms"
+    form_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    project_type = Column(Integer, ForeignKey("project_types.project_type_id"))
+
+    steps = StemTemplate_BackRef
+
+
+class StepTemplate(Base):
+    # 이거 템플릿임.
     __tablename__ = "steps"
     step_id = Column(Integer, primary_key=True, index=True)
     step_number = Column(Integer)
     title = Column(String)
     icon = Column(Integer)      # public s3 path?
-    status = Column(Boolean, default=False)
     content_title = Column(String)
     content_desc1 = Column(String, nullable=True)
     content_desc2 = Column(String, nullable=True)
+    form = Column(Integer, ForeignKey("forms.form_id"))
+
+
+class FormResponse(Base):
+    __tablename__ = "form_responses"
+    form_response_id = Column(Integer, primary_key=True, index=True)
+    # feature added 가져오기위해서. license는 바뀌어도 project는 유지되어야함
+    project = Column(Integer, ForeignKey("projects.project_id"))
+    organization = Column(Integer, ForeignKey("organizations.organization_id"))
+    feature_selected = Column(JSON, nullable=True)  # List of selected template_feature
+    feature_added = Column(JSON, nullable=True)  # added features
+    encrypted_feature = Column(JSON, nullable=True)
+    response = Column(JSON, nullable=True)      # 현재는 present / future 2개, 추후 변경 가능 === 분기, 월별 등등.
+    status = Column(JSON)                       # Step Status List
+    # Order가 FormResponse를 ForeignKey로 가짐
+    # feature added 불러올때 어떻게 해야하나.
+
+
+# class ComplexOrder(Base):
+#     __tablename__ = "main_orders"
+#     main_order_id = Column(Integer, primary_key=True, index=True)
+#     project = Column(Integer, ForeignKey("projects.project_id"))
+#     step_response
+
+
+class HROrder(Base):
+    """
+        T + I 에 해당하는 오더.
+        필요한 정보를 모두 이미 들고 있으면 됨.
+    """
+    __tablename__ = "hr_orders"
+    hr_order_id = Column(Integer, primary_key=True, index=True)
+    project = Column(Integer, ForeignKey("projects.project_id"))
+    form_response = Column(Integer, ForeignKey("form_responses.form_response_id"))
+    label = Column(String)          # project_type이 가지고 있어야하는건가?
+    # organization = Column(ForeignKey("organizations.organization_id"))
+
+
+class HRMediator(Base):
+    __tablename__ = "hr_mediators"
+    hr_mediator_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    hr_order = Column(Integer, ForeignKey("hr_orders.hr_order_id"))
+    train = Column(Integer, ForeignKey("train.train_id"), nullable=True)
+    model = Column(Integer, ForeignKey("model.model_id"), nullable=True)
+    modeling_dataset = Column(Integer, ForeignKey("uploaded_datasets.uploaded_dataset_id"), nullable=True)
+    train_and_validation_dataset = Column(Integer, ForeignKey("uploaded_datasets.uploaded_dataset_id"), nullable=True)
+    inference_dataset = Column(Integer, ForeignKey("uploaded_datasets.uploaded_dataset_id"), nullable=True)
+
+
+# feature template
+class Feature(Base):
+    __tablename__ = "features"
+    feature_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     project_type = Column(Integer, ForeignKey("project_types.project_type_id"))
+    feature_template = Column(JSON)  # 프로젝트 타입별로 미리 작성된 선택피쳐들 템플릿.
+    # essentials
+    # options
 
 
-class StepResponse(Base):
-    __tablename__ = "step_responses"
-    step_response_id = Column(Integer, primary_key=True, index=True)
-    project = Column(Integer, ForeignKey("projects.project_id"))
-
-    response = Column(JSON)     # 현재는 present / future 2개, 추후 변경 가능
 
 
-class MainOrder(Base):
-    __tablename__ = "main_orders"
-    main_order_id = Column(Integer, primary_key=True, index=True)
-    project = Column(Integer, ForeignKey("projects.project_id"))
-    step_response
 
 
     # T, S, I Order는 relationship으로 처리
@@ -119,17 +177,19 @@ class MainOrder(Base):
 
 ####################################################
 
+
 # in optimizer
-membership = Table('membership', Base.metadata,
-                          Column('researcher_id', Integer, ForeignKey("researchers.researcher_id"), primary_key=True),
-                          Column('experiment_id', Integer, ForeignKey("experiments.experiment_id"), primary_key=True),
-                          )
+membership = Table(
+    'membership', Base.metadata,
+    Column('researcher_id', Integer, ForeignKey("researchers.researcher_id"), primary_key=True),
+    Column('experiment_id', Integer, ForeignKey("experiments.experiment_id"), primary_key=True),
+)
+
 
 class Researcher(Base):
     __tablename__ = "researchers"
     researcher_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     researcher_sub = Column(String, unique=True, index=True)        # keycloak "sub"
-
     experiments = relationship("Experiment", secondary=membership, back_populates='researchers')
 
 
@@ -138,15 +198,13 @@ class Experiment(Base):
     __tablename__ = "experiments"
     experiment_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     experiment_name = Column(String)        # 외부 project_id (ex. lean_001)
-    users = Column(Integer, ForeignKey("users.user_id"))      # AFK
     tag = Column(String)        # HR / Univ / Lean (Scope)
-
-    researchers = relationship("Project", secondary=membership, back_populates='experiments')
+    researchers = relationship("Researcher", secondary=membership, back_populates='experiments')
 
 
 # Data App
 class UploadedDataset(Base):
-    __tablename__= "uploaded_datasets"
+    __tablename__ = "uploaded_datasets"
     uploaded_dataset_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     # 기존의 project
     experiment = Column(Integer, ForeignKey("experiments.experiment_id"), cascade="all")
@@ -161,20 +219,23 @@ class UploadedDataset(Base):
 
 
 class DatasetMetadata(Base):
-    __tablename__= "dataset_metadatas"
+    __tablename__ = "dataset_metadatas"
     dataset_metadata_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    uploaded_dataset = Column(Integer, ForeignKey("uploaded_datasets.uploaded_dataset_id"))
     row_count = Column(Integer)     # data record 수
     missing_rate = Column(JSON)     # 각 column 별 결측치 비율
     data_formats = Column(JSON)     # 각 column 별 datatype 및 format
 
 
+## optimizer web
 class Train(Base):
     __tablename__ = "trains"
     train_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     experiment = Column(Integer, ForeignKey("experiments.experiment_id"))
     # models.ForeignKey(ProjectTable, on_delete=models.PROTECT, related_name='project_train')
     dag_run_id = Column(String)
-    datafile = Column(Integer, ForeignKey("uploaded_datasets.upload_dataset_id"))   # AFK
+    # datafile = Column(Integer, ForeignKey("uploaded_datasets.upload_dataset_id"))   # AFK
+    data_files = Column(JSON)  # 데이터 AFK 여러개 저장.
     # models.ForeignKey(UploadedDataset, on_delete=models.PROTECT, related_name='uploaded_file')
     label = Column(String)
     type = Column(Integer, ForeignKey("model_types.model_type_id"))
@@ -252,6 +313,3 @@ class ModelMetric(Base):
     bias = Column(Float, nullable=True)
     default_values = Column(JSON, nullable=True)
     params = Column(JSON, nullable=True)
-
-
-
