@@ -40,6 +40,7 @@ class User(Base):
     projects = relationship("Project", secondary=membership, back_populates='users')
 
 
+# Project Metadata
 class ProjectType(Base):
     __tablename__ = "project_types"
     project_type_id = Column(Integer, primary_key=True, index=True)
@@ -47,8 +48,26 @@ class ProjectType(Base):
     project_type_name = Column(String)   # 상품 이름 (퇴사예측)
     best_model_criteria = Column(String)  # auc, f1-score ......and so on
     coverage = Column(Enum("Full", "Half", "Demo"), default="Full")
-    category = Column(Enum("classification", "regression"))
-    feature = Column(Integer, ForeignKey("features.feature_id"))
+    type = Column(Enum("classification", "regression"))
+    feature_template = Column(Integer, ForeignKey("feature_templates.feature_template_id"))        # default feature template
+
+
+# feature depends on ProjectType (Template)
+class FeatureTemplate(Base):
+    __tablename__ = "feature_templates"
+    feature_template_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    essentials = Column(JSON)           # 필수 Feature
+    options = Column(JSON)              # 선택 Feature
+    # feature_template = Column(JSON)  # 프로젝트 타입별로 미리 작성된 선택피쳐들 템플릿.
+    # feature_added = Column(JSON, nullable=True)  # added features
+
+
+# Feature depends on Project
+class Feature(Base):
+    __tablename__ = "feature_responses"
+    feature_response_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    project = Column(Integer, ForeignKey("projects.project_id"))
+    feature_added = Column(JSON)        # 추가 Feature
 
 
 class Project(Base):
@@ -57,6 +76,7 @@ class Project(Base):
     project_type = Column(Integer, ForeignKey("project_types.project_type_id"))
     organization = Column(Integer, ForeignKey("organizations.organization_id"))
     license = Column(Integer, ForeignKey("licenses.license_id"))
+    # 1 project에 n개 order가 생길 수 있음.
     last_main_order = Column(Integer, ForeignKey("main_orders.main_order_id"))
 
     # 1단계 association
@@ -94,6 +114,7 @@ class Form(Base):
     form_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     project_type = Column(Integer, ForeignKey("project_types.project_type_id"))
 
+    # 1 form, n steps 역참조하기 위함
     steps = StemTemplate_BackRef
 
 
@@ -101,7 +122,7 @@ class StepTemplate(Base):
     # 이거 템플릿임.
     __tablename__ = "steps"
     step_id = Column(Integer, primary_key=True, index=True)
-    step_number = Column(Integer)
+    sequence = Column(Integer)
     title = Column(String)
     icon = Column(Integer)      # public s3 path?
     content_title = Column(String)
@@ -115,14 +136,22 @@ class FormResponse(Base):
     form_response_id = Column(Integer, primary_key=True, index=True)
     # feature added 가져오기위해서. license는 바뀌어도 project는 유지되어야함
     project = Column(Integer, ForeignKey("projects.project_id"))
-    organization = Column(Integer, ForeignKey("organizations.organization_id"))
-    feature_selected = Column(JSON, nullable=True)  # List of selected template_feature
-    feature_added = Column(JSON, nullable=True)  # added features
+    # organization = Column(Integer, ForeignKey("organizations.organization_id"))
+    feature_selected = Column(JSON, nullable=True)  # List of selected template_feature (or ARRAY)
     encrypted_feature = Column(JSON, nullable=True)
     response = Column(JSON, nullable=True)      # 현재는 present / future 2개, 추후 변경 가능 === 분기, 월별 등등.
     status = Column(JSON)                       # Step Status List
-    # Order가 FormResponse를 ForeignKey로 가짐
+    # Order 가 FormResponse 를 ForeignKey 로 가짐
     # feature added 불러올때 어떻게 해야하나.
+
+
+# FormResponse 를 기반으로 Order 작성 (산출)
+class Order(Base):
+    __tablename__= "orders"
+    order_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    form_response = Column(Integer, ForeignKey("form_responses.form_response_id"))
+    data = Column(JSON)             # Training Data ID, Validation Data ID, Inference Data ID
+
 
 
 # class ComplexOrder(Base):
@@ -154,16 +183,6 @@ class HRMediator(Base):
     modeling_dataset = Column(Integer, ForeignKey("uploaded_datasets.uploaded_dataset_id"), nullable=True)
     train_and_validation_dataset = Column(Integer, ForeignKey("uploaded_datasets.uploaded_dataset_id"), nullable=True)
     inference_dataset = Column(Integer, ForeignKey("uploaded_datasets.uploaded_dataset_id"), nullable=True)
-
-
-# feature template
-class Feature(Base):
-    __tablename__ = "features"
-    feature_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    project_type = Column(Integer, ForeignKey("project_types.project_type_id"))
-    feature_template = Column(JSON)  # 프로젝트 타입별로 미리 작성된 선택피쳐들 템플릿.
-    # essentials
-    # options
 
 
 
