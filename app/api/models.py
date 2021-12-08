@@ -159,49 +159,29 @@ class Order(Base):
     started_at = Column(Date)           # Dashboard 는 Order(Train) 기준으로 History
     finished_at = Column(Date)          # Dashboard finished date for History
     train = Column(Integer, ForeignKey("train_id"))     # AFK. Order : Train = 1 : 1
-    model = Column(Integer, ForeignKey("model_id"))     # AFK.
+    best_model = Column(Integer, ForeignKey("model_id"))     # AFK.
     product_type = Column(Integer, ForeignKey("product_types.product_type_id"))     # for OrderMediation (?)
     # Data 의 JSON Format 에 따라서 다른 종류의 train 을 호출할 수 있다면? or product_type 에 따라서?
     # 암호화 적용됨 - encrypted_feature 을 null 인지 아닌지 판별해서 적용
     # Data metadata, Model Metric 은 각각 Data App, Optimizer 에서 받아옴
 
-# class ComplexOrder(Base):
-#     __tablename__ = "main_orders"
-#     main_order_id = Column(Integer, primary_key=True, index=True)
-#     project = Column(Integer, ForeignKey("projects.project_id"))
-#     step_response
+
+# product type 별 progress 의 template
+class ProgressTemplate(Base):
+    __tablename__ = "progress_templates"
+    progress_template_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    product_type = Column(Integer, ForeignKey("product_types.product_type_id"))
+    content = Column(JSON)              # 각 step별 내용들, 말풍선 title, 말풍선 등
 
 
-class HROrder(Base):
-    """
-        T + I 에 해당하는 오더.
-        필요한 정보를 모두 이미 들고 있으면 됨.
-    """
-    __tablename__ = "hr_orders"
-    hr_order_id = Column(Integer, primary_key=True, index=True)
-    project = Column(Integer, ForeignKey("projects.project_id"))
-    form_response = Column(Integer, ForeignKey("form_responses.form_response_id"))
-    label = Column(String)          # project_type이 가지고 있어야하는건가?
-    # organization = Column(ForeignKey("organizations.organization_id"))
-
-
-class HRMediator(Base):
-    __tablename__ = "hr_mediators"
-    hr_mediator_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    hr_order = Column(Integer, ForeignKey("hr_orders.hr_order_id"))
-    train = Column(Integer, ForeignKey("train.train_id"), nullable=True)
-    model = Column(Integer, ForeignKey("model.model_id"), nullable=True)
-    modeling_dataset = Column(Integer, ForeignKey("uploaded_datasets.uploaded_dataset_id"), nullable=True)
-    train_and_validation_dataset = Column(Integer, ForeignKey("uploaded_datasets.uploaded_dataset_id"), nullable=True)
-    inference_dataset = Column(Integer, ForeignKey("uploaded_datasets.uploaded_dataset_id"), nullable=True)
-
-
-
-
-
-
-    # T, S, I Order는 relationship으로 처리
-
+# progress template 를 포함한 각 step별 시간
+class Progress(Base):
+    __tablename__ = "progress"
+    progress_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    order = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    progress_template = Column(Integer, ForeignKey("progress_templates.progress_template_id"))
+    # 각 스텝별 진행 시간 저장
+    duration = Column(JSON)             # start_time, end_time
 
 
 
