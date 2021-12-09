@@ -1,6 +1,7 @@
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Table, Enum, Date, JSON, DateTime, Float, ARRAY
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relation, relationship
 from sqlalchemy.ext.associationproxy import association_proxy
+from sqlalchemy.orm.relationships import foreign
 from sqlalchemy_utils import EmailType, UUIDType
 
 # SQLAlchemy model 생성 전에 반드시 import
@@ -32,7 +33,7 @@ class User(Base):
     __tablename__ = "users"
     user_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     # role = Column()
-    organization = Column(Integer, ForeignKey("organizations.organization_id"))
+    organization = Column(Integer, ForeignKey("organizations.organization_id"), index=True)
     username = Column(String, unique=True)
     email = Column(EmailType, unique=True)          # admin@organization.~~~
     phone_number = Column(String, default='')       # format
@@ -50,11 +51,9 @@ class User(Base):
 class Project(Base):
     __tablename__ = "projects"
     project_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    product = Column(Integer, ForeignKey("products.product_id"))
-    organization = Column(Integer, ForeignKey("organizations.organization_id"))
-    license = Column(Integer, ForeignKey("licenses.license_id"))
-    # 1 project에 n개 order가 생길 수 있음.
-    last_main_order = Column(Integer, ForeignKey("main_orders.main_order_id"))
+    product = Column(Integer, unique=True, index=True)  #AFK
+    organization = Column(Integer, ForeignKey("organizations.organization_id"), index=True)
+    license = Column(Integer, ForeignKey("licenses.license_id"), index=True)
 
     # 1단계 association
     # users = relationship("Membership", back_populates='projects')
@@ -68,13 +67,13 @@ class License(Base):
     predict_period = Column(Enum("monthly", "yearly", "half", "quarter"))   # 예측 주기
     start_date = Column(Date)  # license 시작 날짜
     end_date = Column(Date)    # license 끝 날짜
-    organization = Column(Integer, ForeignKey("organizations.organization_id"))
-    product = Column(Integer, ForeignKey("products.product_id"))
-    description = Column(String)
+    organization = Column(Integer, ForeignKey("organizations.organization_id"), index=True)
+    product = Column(Integer, index=True, unique=True) # AFK
+    description = Column(String, default='')
     is_demo = Column(Boolean, default=False)        # default false
     is_activated = Column(Boolean, default=False)   # default false
     is_last = Column(Boolean, default=False)        # 임시. ADMIN page 에서 last license 만 보여주기 위함
-
+    project = relationship("Project", backref="license")
 
 # Public S3, S3 bucket은 고정. 고정된 S3 bucket에 지정된 path만 적용되면 됨.
 # s3://bucket_name/organization_id/filename.png
@@ -84,9 +83,10 @@ class Organization(Base):
     name = Column(String, unique=True)
     domain = Column(String)         # 구 url
     bi = Column("FILEFIELD", default="ALAB favicon")            # public s3 path, url
-    admin_user = Column(Integer, ForeignKey("users.user_id"), nullable=True)
-    users = relationship("User", backref="organizations", cascade="all, delete")
-
+    admin_user = Column(Integer, ForeignKey("users.user_id"), nullable=True, index=True)
+    users = relationship("User", backref="organizations", cascade="all, delete") # cascade , 조금 더 고민
+    projects = relationship("Project", backref="organizations")
+    licenses = relationship("License", backref="organizations")
 
 ##########################################
 ########### ORDER APP ################
@@ -103,34 +103,39 @@ class Product(Base):
     # feature_template = Column(Integer, ForeignKey("feature_templates.feature_template_id"))
     icon = Column(String)                   # product type icon (from public s3)
     image = Column(String)                  # product image path (from public s3)
-
+    form = relationship("Form", backref="product")
+    feature_template = relationship("FeatureTemplate", backref="product")
+    orders = relationship("Order", backref="product") #for shortcut
+    pipeline_template = relationship("PipelineTemplate", backref="product")
 
 # feature depends on ProjectType (Template)
 class FeatureTemplate(Base):
     __tablename__ = "feature_templates"
     feature_template_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    product = Column(Integer, ForeignKey("products.product_id"), unique=True, index=True)
     essentials = Column(JSON)           # 필수 Feature
     options = Column(JSON)              # 선택 Feature
     # feature_template = Column(JSON)  # 프로젝트 타입별로 미리 작성된 선택피쳐들 템플릿.
     # feature_added = Column(JSON, nullable=True)  # added features
+    feature = relationship("Feature", backref="feature_template")
 
 
 # Feature depends on Project
 class Feature(Base):
     __tablename__ = "features"
     feature_response_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    project = Column(Integer, ForeignKey("projects.project_id"))
-    feature_template = Column(Integer, ForeignKey("feature_templates.feature_template_id"))
+    project = Column(Integer, index=True, unique=True) #AFK
+    feature_template = Column(Integer, ForeignKey("feature_templates.feature_template_id"), index=True)
     feature_added = Column(JSON)        # 추가 Feature
 
 
 class Form(Base):
     __tablename__ = "forms"
     form_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    product = Column(Integer, ForeignKey("products.product_id"))
+    product = Column(Integer, ForeignKey("products.product_id"), unique=True, index=True)
 
     # 1 form, n steps 역참조하기 위함
-    steps = relationship("step_templates")
+    step_templates = relationship("StepTemplate", backref="form")
 
 
 class StepTemplate(Base):
@@ -143,7 +148,7 @@ class StepTemplate(Base):
     content_title = Column(String)
     content_desc1 = Column(String, nullable=True)
     content_desc2 = Column(String, nullable=True)
-    form = Column(Integer, ForeignKey("forms.form_id"))
+    form = Column(Integer, ForeignKey("forms.form_id"), index=True)
 
 
 # FormResponse 는 항상 최상단에는 last 만 보이게끔
@@ -151,12 +156,13 @@ class FormResponse(Base):
     __tablename__ = "form_responses"
     form_response_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     # feature added 가져오기위해서. license 는 바뀌어도 product 는 유지되어야함
-    project = Column(Integer, ForeignKey("projects.project_id"))
+    project = Column(Integer, index=True) #AFK
     feature_selected = Column(JSON, nullable=True)  # List of selected template_feature (or ARRAY)
     response = Column(JSON, nullable=True)          # 현재는 present / future 2개, 추후 변경 가능 === 분기, 월별 등등.
     status = Column(JSON)                           # Step Status List
     # Order 가 FormResponse 를 ForeignKey 로 가짐
     # FormResponse : Order = 1 : N 가능
+    orders = relationship("Order", backref="form_response")
 
 
 # FormResponse 를 기반으로 Order 작성 (산출)
@@ -165,33 +171,34 @@ class Order(Base):
     __tablename__= "orders"
     order_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     # form response 는 동일해도, 여러번 학습을 하면 여러번의 Order 발생
-    form_response = Column(Integer, ForeignKey("form_responses.form_response_id"))
+    form_response = Column(Integer, ForeignKey("form_responses.form_response_id"), index=True)
     encrypted_feature = Column(JSON, nullable=True)
     data = Column(JSON)                 # Training Data ID, Validation Data ID, Inference Data ID
     started_at = Column(Date)           # Dashboard 는 Order(Train) 기준으로 History
     finished_at = Column(Date)          # Dashboard finished date for History
-    train = Column(Integer, ForeignKey("train_id"))     # AFK. Order : Train = 1 : 1
-    best_model = Column(Integer, ForeignKey("model_id"))     # AFK.
-    product = Column(Integer, ForeignKey("products.product_id"))     # for OrderMediation (?)
+    train = Column(Integer, unique=True, index=True)     # AFK. Order : Train = 1 : 1
+    best_model = Column(Integer, unique=True, index=True)     # AFK.
+    product = Column(Integer, ForeignKey("products.product_id"), index=True)     # for shortcut
     # Data 의 JSON Format 에 따라서 다른 종류의 train 을 호출할 수 있다면? or product 에 따라서?
     # 암호화 적용됨 - encrypted_feature 을 null 인지 아닌지 판별해서 적용
     # Data metadata, Model Metric 은 각각 Data App, Optimizer 에서 받아옴
-
+    pipeline = relationship("Pipeline", backref="order")
 
 # product 별 progress 의 template
 class PipelineTemplate(Base):
     __tablename__ = "pipeline_templates"
     pipeline_template_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    product = Column(Integer, ForeignKey("products.product_id"))
+    product = Column(Integer, ForeignKey("products.product_id"), unique=True, index=True)
     content = Column(JSON)              # 각 step 별 내용들, 말풍선 title, 말풍선 등
+    pipeline = relationship("Pipeline", backref="order")
 
 
 # pipeline template 를 포함한 progress
 class Pipeline(Base):
     __tablename__ = "pipelines"
     pipeline_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    order = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    pipeline_template = Column(Integer, ForeignKey("pipeline_templates.pipeline_template_id"))
+    order = Column(Integer, ForeignKey("orders.order_id"), index=True)
+    pipeline_template = Column(Integer, ForeignKey("pipeline_templates.pipeline_template_id"), index=True)
     progress = Column(JSON)             # status and duration for each pipelines
 
 
