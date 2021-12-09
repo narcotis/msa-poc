@@ -6,12 +6,6 @@ from sqlalchemy_utils import EmailType, UUIDType
 # SQLAlchemy model 생성 전에 반드시 import
 from .database import Base
 
-# 2단계 association
-membership = Table('membership', Base.metadata,
-                          Column('user_id', Integer, ForeignKey("users.user_id"), primary_key=True),
-                          Column('product_id', Integer, ForeignKey("products.product_id"), primary_key=True),
-                          Column('role', Enum("Manager","Member"))
-                          )
 # 1단계 association
 # class Membership(Base):
 #     __tablename__ = "membership"
@@ -22,35 +16,93 @@ membership = Table('membership', Base.metadata,
 #     project = relationship("Project", back_populates="membership")
 
 
+##########################################
+########### PROJECT APP ################
+#########################################
+
+# 2단계 association
+membership = Table('membership', Base.metadata,
+                          Column('user_id', Integer, ForeignKey("users.user_id"), primary_key=True),
+                          Column('product_id', Integer, ForeignKey("products.product_id"), primary_key=True),
+                          Column('role', Enum("Manager","Member"))
+                          )
+
+
 class User(Base):
     __tablename__ = "users"
-    user_id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     # role = Column()
     organization = Column(Integer, ForeignKey("organizations.organization_id"))
     username = Column(String, unique=True)
-    email = Column(EmailType, unique=True)      # admin@organization.~~~
-    phonenumber = Column(String, default='')    # format
-    realname = Column(String, default='')       # UTF-8
-    is_initiated = Column(Boolean, default=False)    # invitation pending or not
+    email = Column(EmailType, unique=True)          # admin@organization.~~~
+    phone_number = Column(String, default='')       # format
+    real_name = Column(String, default='')          # UTF-8
+    is_initiated = Column(Boolean, default=False)   # invitation pending or not
     department = Column(String, default='')
     position = Column(String, default='')
-    init_date = Column(Date)                    # initiated date
+    init_date = Column(Date, nullable=True)
+    # initiated date
     # 1단계 association
     # projects = relationship("Membership", back_populates='users')
-    products = relationship("Product", secondary=membership, back_populates='users')
+    projects = relationship("Project", secondary=membership, back_populates='users')
 
 
+class Project(Base):
+    __tablename__ = "projects"
+    project_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    product = Column(Integer, ForeignKey("products.product_id"))
+    organization = Column(Integer, ForeignKey("organizations.organization_id"))
+    license = Column(Integer, ForeignKey("licenses.license_id"))
+    # 1 project에 n개 order가 생길 수 있음.
+    last_main_order = Column(Integer, ForeignKey("main_orders.main_order_id"))
+
+    # 1단계 association
+    # users = relationship("Membership", back_populates='projects')
+    users = relationship("User", secondary=membership, back_populates='projects')
+
+
+class License(Base):
+    __tablename__ = 'licences'
+    license_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    code = Column(UUIDType(binary=False), unique=True)
+    predict_period = Column(Enum("monthly", "yearly", "half", "quarter"))   # 예측 주기
+    start_date = Column(Date)  # license 시작 날짜
+    end_date = Column(Date)    # license 끝 날짜
+    organization = Column(Integer, ForeignKey("organizations.organization_id"))
+    product = Column(Integer, ForeignKey("products.product_id"))
+    description = Column(String)
+    is_demo = Column(Boolean, default=False)        # default false
+    is_activated = Column(Boolean, default=False)   # default false
+    is_last = Column(Boolean, default=False)        # 임시. ADMIN page 에서 last license 만 보여주기 위함
+
+
+# Public S3, S3 bucket은 고정. 고정된 S3 bucket에 지정된 path만 적용되면 됨.
+# s3://bucket_name/organization_id/filename.png
+class Organization(Base):
+    __tablename__ = "organizations"
+    organization_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String, unique=True)
+    domain = Column(String)         # 구 url
+    bi = Column("FILEFIELD", default="ALAB favicon")            # public s3 path, url
+    admin_user = Column(Integer, ForeignKey("users.user_id"), nullable=True)
+    users = relationship("User", backref="organizations", cascade="all, delete")
+
+
+##########################################
+########### ORDER APP ################
+#########################################
 # Product Metadata
-class ProductType(Base):
-    __tablename__ = "product_types"
-    product_type_id = Column(Integer, primary_key=True, index=True)
+class Product(Base):
+    __tablename__ = "products"
+    product_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     category = Column(Enum("HR", "Univ"))  # HR / Univ (Scope) - tag in Optimizer Experiment
-    product_type_name = Column(String)   # 상품 이름 (퇴사예측)
+    product_name = Column(String)   # 상품 이름 (퇴사예측)
     best_model_criteria = Column(String)  # auc, f1-score ......and so on
     coverage = Column(Enum("Full", "Half", "Demo"), default="Full")
     type = Column(Enum("classification", "regression"))
     # feature_template = Column(Integer, ForeignKey("feature_templates.feature_template_id"))
     icon = Column(String)                   # product type icon (from public s3)
+    image = Column(String)                  # product image path (from public s3)
 
 
 # feature depends on ProjectType (Template)
@@ -67,55 +119,15 @@ class FeatureTemplate(Base):
 class Feature(Base):
     __tablename__ = "features"
     feature_response_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    product = Column(Integer, ForeignKey("products.product_id"))
+    project = Column(Integer, ForeignKey("projects.project_id"))
     feature_template = Column(Integer, ForeignKey("feature_templates.feature_template_id"))
     feature_added = Column(JSON)        # 추가 Feature
-
-
-class Product(Base):
-    __tablename__ = "products"
-    product_id = Column(Integer, primary_key=True, index=True)
-    product_type = Column(Integer, ForeignKey("product_types.product_type_id"))
-    organization = Column(Integer, ForeignKey("organizations.organization_id"))
-    license = Column(Integer, ForeignKey("licenses.license_id"))
-    # 1 project에 n개 order가 생길 수 있음.
-    last_main_order = Column(Integer, ForeignKey("main_orders.main_order_id"))
-
-    # 1단계 association
-    # users = relationship("Membership", back_populates='projects')
-    users = relationship("User", secondary=membership, back_populates='products')
-
-
-class License(Base):
-    __tablename__ = 'licences'
-    license_id = Column(Integer, primary_key=True, index=True)
-    code = Column(UUIDType(binary=False), unique=True)
-    predict_period = Column(Enum("monthly", "yearly", "half", "quarter"))   # 예측 주기
-    start_date = Column(Date)  # license 시작 날짜
-    end_date = Column(Date)    # license 끝 날짜
-    organization = Column(Integer, ForeignKey("organizations.organization_id"))
-    product_type = Column(Integer, ForeignKey("product_types.product_type_id"))
-    description = Column(String)
-    is_demo = Column(Boolean, default=False)        # default false
-    is_activated = Column(Boolean, default=False)   # default false
-    is_last = Column(Boolean, default=False)        # 임시. ADMIN page 에서 last license 만 보여주기 위함
-
-
-# Public S3, S3 bucket은 고정. 고정된 S3 bucket에 지정된 path만 적용되면 됨.
-# s3://bucket_name/organization_id/filename.png
-class Organization(Base):
-    __tablename__ = "organizations"
-    organization_id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, unique=True)
-    domain = Column(String)         # 구 url
-    bi = Column("FILEFIELD", default="ALAB favicon")            # public s3 path, url
-    admin_user = Column(Integer, ForeignKey("users.user_id"), nullable=True)
 
 
 class Form(Base):
     __tablename__ = "forms"
     form_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    product_type = Column(Integer, ForeignKey("product_types.product_type_id"))
+    product = Column(Integer, ForeignKey("products.product_id"))
 
     # 1 form, n steps 역참조하기 위함
     steps = relationship("step_templates")
@@ -124,7 +136,7 @@ class Form(Base):
 class StepTemplate(Base):
     # 이거 템플릿임.
     __tablename__ = "step_templates"
-    step_template_id = Column(Integer, primary_key=True, index=True)
+    step_template_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     sequence = Column(Integer)
     title = Column(String)
     icon = Column(Integer)      # public s3 path?
@@ -137,9 +149,9 @@ class StepTemplate(Base):
 # FormResponse 는 항상 최상단에는 last 만 보이게끔
 class FormResponse(Base):
     __tablename__ = "form_responses"
-    form_response_id = Column(Integer, primary_key=True, index=True)
+    form_response_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     # feature added 가져오기위해서. license 는 바뀌어도 product 는 유지되어야함
-    product = Column(Integer, ForeignKey("products.product_id"))
+    project = Column(Integer, ForeignKey("projects.project_id"))
     feature_selected = Column(JSON, nullable=True)  # List of selected template_feature (or ARRAY)
     response = Column(JSON, nullable=True)          # 현재는 present / future 2개, 추후 변경 가능 === 분기, 월별 등등.
     status = Column(JSON)                           # Step Status List
@@ -160,29 +172,27 @@ class Order(Base):
     finished_at = Column(Date)          # Dashboard finished date for History
     train = Column(Integer, ForeignKey("train_id"))     # AFK. Order : Train = 1 : 1
     best_model = Column(Integer, ForeignKey("model_id"))     # AFK.
-    product_type = Column(Integer, ForeignKey("product_types.product_type_id"))     # for OrderMediation (?)
-    # Data 의 JSON Format 에 따라서 다른 종류의 train 을 호출할 수 있다면? or product_type 에 따라서?
+    product = Column(Integer, ForeignKey("products.product_id"))     # for OrderMediation (?)
+    # Data 의 JSON Format 에 따라서 다른 종류의 train 을 호출할 수 있다면? or product 에 따라서?
     # 암호화 적용됨 - encrypted_feature 을 null 인지 아닌지 판별해서 적용
     # Data metadata, Model Metric 은 각각 Data App, Optimizer 에서 받아옴
 
 
-# product type 별 progress 의 template
-class ProgressTemplate(Base):
-    __tablename__ = "progress_templates"
-    progress_template_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    product_type = Column(Integer, ForeignKey("product_types.product_type_id"))
-    content = Column(JSON)              # 각 step별 내용들, 말풍선 title, 말풍선 등
+# product 별 progress 의 template
+class PipelineTemplate(Base):
+    __tablename__ = "pipeline_templates"
+    pipeline_template_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    product = Column(Integer, ForeignKey("products.product_id"))
+    content = Column(JSON)              # 각 step 별 내용들, 말풍선 title, 말풍선 등
 
 
-# progress template 를 포함한 각 step별 시간
-class Progress(Base):
-    __tablename__ = "progress"
-    progress_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+# pipeline template 를 포함한 progress
+class Pipeline(Base):
+    __tablename__ = "pipelines"
+    pipeline_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     order = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    progress_template = Column(Integer, ForeignKey("progress_templates.progress_template_id"))
-    # 각 스텝별 진행 시간 저장
-    duration = Column(JSON)             # start_time, end_time
-
+    pipeline_template = Column(Integer, ForeignKey("pipeline_templates.pipeline_template_id"))
+    progress = Column(JSON)             # status and duration for each pipelines
 
 
 ####################################################
