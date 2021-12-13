@@ -24,7 +24,7 @@ from .database import Base
 # 2단계 association
 membership = Table('membership', Base.metadata,
                           Column('user_id', Integer, ForeignKey("users.user_id"), primary_key=True),
-                          Column('product_id', Integer, ForeignKey("products.product_id"), primary_key=True),
+                          Column('project_id', Integer, ForeignKey("projects.project_id"), primary_key=True),
                           Column('role', Enum("Manager","Member"))
                           )
 
@@ -32,8 +32,8 @@ membership = Table('membership', Base.metadata,
 class User(Base):
     __tablename__ = "users"
     user_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    # role = Column()
-    organization = Column(Integer, ForeignKey("organizations.organization_id"), index=True)
+    # organization nullable 은 ALAB 운영자들을 위해
+    organization = Column(Integer, ForeignKey("organizations.organization_id"), index=True, nullable=True)
     username = Column(String, unique=True)
     email = Column(EmailType, unique=True)          # admin@organization.~~~
     phone_number = Column(String, default='')       # format
@@ -64,13 +64,13 @@ class License(Base):
     __tablename__ = 'licences'
     license_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     code = Column(UUIDType(binary=False), unique=True)
-    predict_period = Column(Enum("monthly", "yearly", "half", "quarter"))   # 예측 주기
+    interval = Column(Enum("monthly", "yearly", "half", "quarter"))   # 예측 주기
     start_date = Column(Date)  # license 시작 날짜
     end_date = Column(Date)    # license 끝 날짜
     organization = Column(Integer, ForeignKey("organizations.organization_id"), index=True)
     product = Column(Integer, index=True, unique=True) # AFK
     description = Column(String, default='')
-    is_demo = Column(Boolean, default=False)        # default false
+    is_trial = Column(Boolean, default=False)        # default false
     is_activated = Column(Boolean, default=False)   # default false
     is_last = Column(Boolean, default=False)        # 임시. ADMIN page 에서 last license 만 보여주기 위함
     project = relationship("Project", backref="license")
@@ -81,12 +81,22 @@ class Organization(Base):
     __tablename__ = "organizations"
     organization_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     name = Column(String, unique=True)
-    domain = Column(String)         # 구 url
+    domain = Column(String, unique=True)         # 구 url
     bi = Column("FILEFIELD", default="ALAB favicon")            # public s3 path, url
     admin_user = Column(Integer, ForeignKey("users.user_id"), nullable=True, index=True)
     users = relationship("User", backref="organizations", cascade="all, delete") # cascade , 조금 더 고민
     projects = relationship("Project", backref="organizations")
     licenses = relationship("License", backref="organizations")
+
+
+# Order App 의 Product 중에서 일부분만 저장.
+class Product(Base):
+    __tablename__ = "products"
+    product_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    category = Column(Enum("HR", "Univ"))  # HR / Univ (Scope) - tag in Optimizer Experiment
+    product_name = Column(String)   # 상품 이름 (퇴사예측)
+    # feature_template = Column(Integer, ForeignKey("feature_templates.feature_template_id"))
+    icon = Column(String)                   # product type icon (from public s3)
 
 ##########################################
 ########### ORDER APP ################
