@@ -42,6 +42,7 @@ class User(Base):
     department = Column(String, default='')
     position = Column(String, default='')
     init_date = Column(Date, nullable=True)
+    sub = Column(String, unique=True)               # unique sub from keycloak
     # initiated date
     # 1단계 association
     # projects = relationship("Membership", back_populates='users')
