@@ -139,6 +139,7 @@ class Feature(Base):
     project = Column(Integer, index=True, unique=True) #AFK
     feature_template = Column(Integer, ForeignKey("feature_templates.feature_template_id"), index=True)
     feature_added = Column(JSON)        # 추가 Feature
+    feature_selected = Column(JSON, nullable=True)  # List of selected template_feature (or ARRAY)
 
 
 class Form(Base):
@@ -169,7 +170,6 @@ class FormResponse(Base):
     form_response_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     # feature added 가져오기위해서. license 는 바뀌어도 product 는 유지되어야함
     project = Column(Integer, index=True) #AFK
-    feature_selected = Column(JSON, nullable=True)  # List of selected template_feature (or ARRAY)
     response = Column(JSON, nullable=True)          # 현재는 present / future 2개, 추후 변경 가능 === 분기, 월별 등등.
     status = Column(JSON)                           # Step Status List
     # Order 가 FormResponse 를 ForeignKey 로 가짐
