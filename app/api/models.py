@@ -134,7 +134,7 @@ class FeatureTemplate(Base):
 # Feature depends on Project
 class Feature(Base):
     __tablename__ = "features"
-    feature_response_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    feature_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     project = Column(Integer, index=True, unique=True) #AFK
     feature_template = Column(Integer, ForeignKey("feature_templates.feature_template_id"), index=True)
     feature_added = Column(JSON)        # 추가 Feature
