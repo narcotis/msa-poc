@@ -149,6 +149,7 @@ class Form(Base):
 
     # 1 form, n steps 역참조하기 위함
     step_templates = relationship("StepTemplate", backref="form")
+    form = relationship("FormResponse", backref="form")
 
 
 class StepTemplate(Base):
@@ -172,6 +173,7 @@ class FormResponse(Base):
     project = Column(Integer, index=True) #AFK
     response = Column(JSON, nullable=True)          # 현재는 present / future 2개, 추후 변경 가능 === 분기, 월별 등등.
     status = Column(JSON)                           # Step Status List
+    form = Column(Integer, ForeignKey("forms.form_id"))
     # Order 가 FormResponse 를 ForeignKey 로 가짐
     # FormResponse : Order = 1 : N 가능
     orders = relationship("Order", backref="form_response")
