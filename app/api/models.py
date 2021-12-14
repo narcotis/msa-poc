@@ -73,7 +73,7 @@ class License(Base):
     description = Column(String, default='')
     is_trial = Column(Boolean, default=False)        # default false
     is_activated = Column(Boolean, default=False)   # default false
-    is_last = Column(Boolean, default=False)        # 임시. ADMIN page 에서 last license 만 보여주기 위함
+    is_last = Column(Boolean, default=True)        # 임시. ADMIN page 에서 last license 만 보여주기 위함
     project = relationship("Project", backref="license")
 
 # Public S3, S3 bucket은 고정. 고정된 S3 bucket에 지정된 path만 적용되면 됨.
@@ -126,6 +126,7 @@ class FeatureTemplate(Base):
     product = Column(Integer, ForeignKey("products.product_id"), unique=True, index=True)
     essentials = Column(JSON)           # 필수 Feature
     options = Column(JSON)              # 선택 Feature
+    formats = Column(ARRAY(String, dimensions=1, zero_indexes=True, as_tuple=False))    # for column format examples
     # feature_template = Column(JSON)  # 프로젝트 타입별로 미리 작성된 선택피쳐들 템플릿.
     # feature_added = Column(JSON, nullable=True)  # added features
     feature = relationship("Feature", backref="feature_template")
@@ -184,11 +185,11 @@ class Order(Base):
     # form response 는 동일해도, 여러번 학습을 하면 여러번의 Order 발생
     form_response = Column(Integer, ForeignKey("form_responses.form_response_id"), index=True)
     encrypted_feature = Column(JSON, nullable=True)
-    data = Column(JSON)                 # Training Data ID, Validation Data ID, Inference Data ID
-    started_at = Column(Date)           # Dashboard 는 Order(Train) 기준으로 History
-    finished_at = Column(Date)          # Dashboard finished date for History
-    train = Column(Integer, unique=True, index=True)     # AFK. Order : Train = 1 : 1
-    best_model = Column(Integer, unique=True, index=True)     # AFK.
+    data = Column(JSON, nullable=True)                 # Training Data ID, Validation Data ID, Inference Data ID
+    started_at = Column(Date, nullable=True)           # Dashboard 는 Order(Train) 기준으로 History
+    finished_at = Column(Date, nullable=True)          # Dashboard finished date for History
+    train = Column(Integer, unique=True, index=True, nullable=True)     # AFK. Order : Train = 1 : 1
+    best_model = Column(Integer, unique=True, index=True, nullable=True)     # AFK.
     product = Column(Integer, ForeignKey("products.product_id"), index=True)     # for shortcut
     # Data 의 JSON Format 에 따라서 다른 종류의 train 을 호출할 수 있다면? or product 에 따라서?
     # 암호화 적용됨 - encrypted_feature 을 null 인지 아닌지 판별해서 적용
