@@ -76,6 +76,7 @@ class License(Base):
     is_last = Column(Boolean, default=True)        # 임시. ADMIN page 에서 last license 만 보여주기 위함
     project = relationship("Project", backref="license")
 
+
 # Public S3, S3 bucket은 고정. 고정된 S3 bucket에 지정된 path만 적용되면 됨.
 # s3://bucket_name/organization_id/filename.png
 class Organization(Base):
@@ -99,6 +100,7 @@ class Product(Base):
     # feature_template = Column(Integer, ForeignKey("feature_templates.feature_template_id"))
     icon = Column(String)                   # product type icon (from public s3)
 
+
 ##########################################
 ########### ORDER APP ################
 #########################################
@@ -119,6 +121,46 @@ class Product(Base):
     orders = relationship("Order", backref="product") #for shortcut
     pipeline_template = relationship("PipelineTemplate", backref="product")
 
+
+class Template(Base):
+    __tablename__ = "templates"
+    template_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    product = Column(Integer, ForeignKey("products.product_id"), unique=True, index=True)
+    # step_template = Column(Integer, ForeignKey("step_templates.step_template_id"))
+    feature_template = Column(Integer, ForeignKey("feature_templates.feature_template_id"), unique=True)
+    pipeline_template = Column(Integer, ForeignKey("pipeline_templates.pipeline_template_id"), unique=True)
+
+    forms = relationship("Form", backref="template")
+    step_templates = relationship("StepTemplate", backref="template")
+
+
+# 새로운 탄생
+class Form(Base):
+    __tablename__ = "forms"
+    form_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    project = Column(Integer, index=True)       # AFK
+    template = Column(Integer, ForeignKey("templates.template_id"))     # template layer
+    form_response = Column(Integer, ForeignKey("form_responses.form_response_id"), unique=True)
+
+
+# FormResponse 는 항상 최상단에는 last 만 보이게끔
+class FormResponse(Base):
+    __tablename__ = "form_responses"
+    form_response_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    # feature added 가져오기위해서. license 는 바뀌어도 product 는 유지되어야함
+    step_response = Column(JSON, nullable=True)          # 현재는 present / future 2개, 추후 변경 가능 === 분기, 월별 등등.
+    step_status = Column(JSON)                           # Step Status List
+    progress = Column(JSON)  # status and duration for pipeline
+    feature = Column(Integer, ForeignKey("features.feature_id"), nullable=True)
+    # feature 는 project 에 mapping 되기 때문에 foreignkey 만 가지는것으로.
+    is_locked = Column(Boolean, default=False)        # 학습중 mutex
+
+    # Order 가 FormResponse 를 ForeignKey 로 가짐
+    # FormResponse : Order = 1 : N 가능
+    orders = relationship("Order", backref="form_response")
+    form = relationship("Form", backref="form_response")
+
+
 # feature depends on ProjectType (Template)
 class FeatureTemplate(Base):
     __tablename__ = "feature_templates"
@@ -130,6 +172,7 @@ class FeatureTemplate(Base):
     # feature_template = Column(JSON)  # 프로젝트 타입별로 미리 작성된 선택피쳐들 템플릿.
     # feature_added = Column(JSON, nullable=True)  # added features
     feature = relationship("Feature", backref="feature_template")
+    template = relationship("Template", backref="feature_template")
 
 
 # Feature depends on Project
@@ -142,16 +185,6 @@ class Feature(Base):
     feature_selected = Column(JSON, nullable=True)  # List of selected template_feature (or ARRAY)
 
 
-class Form(Base):
-    __tablename__ = "forms"
-    form_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    product = Column(Integer, ForeignKey("products.product_id"), unique=True, index=True)
-
-    # 1 form, n steps 역참조하기 위함
-    step_templates = relationship("StepTemplate", backref="form")
-    form = relationship("FormResponse", backref="form")
-
-
 class StepTemplate(Base):
     # 이거 템플릿임.
     __tablename__ = "step_templates"
@@ -162,21 +195,7 @@ class StepTemplate(Base):
     content_title = Column(String)
     content_desc1 = Column(String, nullable=True)
     content_desc2 = Column(String, nullable=True)
-    form = Column(Integer, ForeignKey("forms.form_id"), index=True)
-
-
-# FormResponse 는 항상 최상단에는 last 만 보이게끔
-class FormResponse(Base):
-    __tablename__ = "form_responses"
-    form_response_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    # feature added 가져오기위해서. license 는 바뀌어도 product 는 유지되어야함
-    project = Column(Integer, index=True) #AFK
-    response = Column(JSON, nullable=True)          # 현재는 present / future 2개, 추후 변경 가능 === 분기, 월별 등등.
-    status = Column(JSON)                           # Step Status List
-    form = Column(Integer, ForeignKey("forms.form_id"))
-    # Order 가 FormResponse 를 ForeignKey 로 가짐
-    # FormResponse : Order = 1 : N 가능
-    orders = relationship("Order", backref="form_response")
+    template = Column(Integer, ForeignKey("templates.template_id"), index=True)
 
 
 # FormResponse 를 기반으로 Order 작성 (산출)
@@ -196,24 +215,26 @@ class Order(Base):
     # Data 의 JSON Format 에 따라서 다른 종류의 train 을 호출할 수 있다면? or product 에 따라서?
     # 암호화 적용됨 - encrypted_feature 을 null 인지 아닌지 판별해서 적용
     # Data metadata, Model Metric 은 각각 Data App, Optimizer 에서 받아옴
-    pipeline = relationship("Pipeline", backref="order")
+    # pipeline = relationship("Pipeline", backref="order")
+
 
 # product 별 progress 의 template
 class PipelineTemplate(Base):
     __tablename__ = "pipeline_templates"
     pipeline_template_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    product = Column(Integer, ForeignKey("products.product_id"), unique=True, index=True)
+    # product = Column(Integer, ForeignKey("products.product_id"), unique=True, index=True)
     content = Column(JSON)              # 각 step 별 내용들, 말풍선 title, 말풍선 등
-    pipeline = relationship("Pipeline", backref="order")
+    template = relationship("Template", backref='pipeline_template')
+    # pipeline = relationship("Pipeline", backref="order")
 
-
-# pipeline template 를 포함한 progress
-class Pipeline(Base):
-    __tablename__ = "pipelines"
-    pipeline_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    order = Column(Integer, ForeignKey("orders.order_id"), index=True)
-    pipeline_template = Column(Integer, ForeignKey("pipeline_templates.pipeline_template_id"), index=True)
-    progress = Column(JSON)             # status and duration for each pipelines
+#
+# # pipeline template 를 포함한 progress
+# class Pipeline(Base):
+#     __tablename__ = "pipelines"
+#     pipeline_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+#     order = Column(Integer, ForeignKey("orders.order_id"), index=True)
+#     pipeline_template = Column(Integer, ForeignKey("pipeline_templates.pipeline_template_id"), index=True)
+#     progress = Column(JSON)             # status and duration for each pipelines
 
 
 ####################################################
