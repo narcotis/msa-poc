@@ -165,7 +165,6 @@ class FormResponse(Base):
 class FeatureTemplate(Base):
     __tablename__ = "feature_templates"
     feature_template_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    product = Column(Integer, ForeignKey("products.product_id"), unique=True, index=True)
     essentials = Column(JSON)           # 필수 Feature
     options = Column(JSON)              # 선택 Feature
     formats = Column(ARRAY(String, dimensions=1, zero_indexes=True, as_tuple=False))    # for column format examples
