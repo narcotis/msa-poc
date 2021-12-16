@@ -52,10 +52,10 @@ class User(Base):
 class Project(Base):
     __tablename__ = "projects"
     project_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    product = Column(Integer, unique=True, index=True)  #AFK
+    product = Column(Integer, unique=True, index=True)  # AFK
     organization = Column(Integer, ForeignKey("organizations.organization_id"), index=True)
     license = Column(Integer, ForeignKey("licenses.license_id"), index=True)
-    is_running = Column(Boolean, default= True)       # 제작중, order app에서 form 생성시, publish
+    is_running = Column(Boolean, default= True)       # 제작중, order app 에서 form 생성시, publish
 
     # 1단계 association
     # users = relationship("Membership", back_populates='projects')
