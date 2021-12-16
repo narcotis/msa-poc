@@ -55,6 +55,7 @@ class Project(Base):
     product = Column(Integer, unique=True, index=True)  #AFK
     organization = Column(Integer, ForeignKey("organizations.organization_id"), index=True)
     license = Column(Integer, ForeignKey("licenses.license_id"), index=True)
+    is_running = Column(Boolean, default= True)       # 제작중, order app에서 form 생성시, publish
 
     # 1단계 association
     # users = relationship("Membership", back_populates='projects')
@@ -194,6 +195,7 @@ class StepTemplate(Base):
     content_title = Column(String)
     content_desc1 = Column(String, nullable=True)
     content_desc2 = Column(String, nullable=True)
+    content_desc3 = Column(String, nullable=True)   # 빨간줄 두줄이기 때문에 추가
     template = Column(Integer, ForeignKey("templates.template_id"), index=True)
 
 
@@ -215,6 +217,14 @@ class Order(Base):
     # 암호화 적용됨 - encrypted_feature 을 null 인지 아닌지 판별해서 적용
     # Data metadata, Model Metric 은 각각 Data App, Optimizer 에서 받아옴
     # pipeline = relationship("Pipeline", backref="order")
+
+    '''
+    {
+        "training_data": 27,
+        "validation_data": 28,
+        "inference_data": 30
+    }
+    '''
 
 
 # product 별 progress 의 template
@@ -274,8 +284,9 @@ class UploadedDataset(Base):
     file_size = Column(String)
     encoding = Column(String)           # UTF-8, CP949 ...
     label = Column(String)
-    dataset_type = Column(String)       # training set, validation set, inference set ...
-    created_at = Column(DateTime)       # Data Version
+    dataset_type = Column(String, nullable=True)        # training set, validation set, inference set ...
+    description = Column(String, nullable=True)         # 2017년 ~ 2019년 3분기 + 2019년 4분기 (퇴사여부 데이터 포함)
+    created_at = Column(DateTime)                       # Data Version
     updated_at = Column(DateTime)
 
 
