@@ -204,7 +204,7 @@ class StepTemplate(Base):
 class Order(Base):
     __tablename__= "orders"
     order_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    # form response 는 동일해도, 여러번 학습을 하면 여러번의 Order 발생
+    # form response 는 동일해도, 여러번 학습을 하면 여러번의 Order 발.....생
     form_response = Column(Integer, ForeignKey("form_responses.form_response_id"), index=True)
     encrypted_feature = Column(JSON, nullable=True)
     data = Column(JSON, nullable=True)                 # Training Data ID, Validation Data ID, Inference Data ID
@@ -212,7 +212,8 @@ class Order(Base):
     finished_at = Column(Date, nullable=True)          # Dashboard finished date for History
     train = Column(Integer, unique=True, index=True, nullable=True)     # AFK. Order : Train = 1 : 1
     best_model = Column(Integer, unique=True, index=True, nullable=True)     # AFK.
-    product = Column(Integer, ForeignKey("products.product_id"), index=True)     # for shortcut
+    # product = Column(Integer, ForeignKey("products.product_id"), index=True)     # for shortcut
+    project = Column(Integer, index=True)                       # For Solutions query, AFK
     # Data 의 JSON Format 에 따라서 다른 종류의 train 을 호출할 수 있다면? or product 에 따라서?
     # 암호화 적용됨 - encrypted_feature 을 null 인지 아닌지 판별해서 적용
     # Data metadata, Model Metric 은 각각 Data App, Optimizer 에서 받아옴
